@@ -420,15 +420,15 @@ Based on 4-week review: recurring tasks, naming/skins, full-screen overlay, Shor
 
 ### 9.3 Timeline and milestones
 
-| Milestone | Target | Definition |
-|---|---|---|
-| M0 Discovery done | Week 1 | Baseline data collected, window/hotkey spike works, art source chosen |
-| M1 Capture + persistence | Week 3 | Stories 1.1, 5.1 pass |
-| M2 Widget + list | Week 4 | Stories 2.1, 2.2, 3.1 pass |
-| M3 Pet + reminders (MVP) | Week 6 | Stories 4.1, 6.1 pass; static pet images |
-| M4 Dogfood week | Week 7 | Owner uses daily; bugs fixed |
-| M5 Delight release | Week 9 | Animations, tokens, weekly summary |
-| M6 First 4-week review | Week 13 | Decide iterate / expand / roll back |
+| Milestone | Target | Definition | Status |
+|---|---|---|---|
+| M0 Discovery done | Week 1 | Baseline data collected, window/hotkey spike works, art source chosen | Partial. The window and hot-key spikes both work (§11 rows 7, 8 closed). Baseline logging (§11 row 2) and the art source (§11 row 9) are still open |
+| M1 Capture + persistence | Week 3 | Stories 1.1, 5.1 pass | **Done 2026-09-06.** Change `add-task-capture-and-storage` archived; all 26 tasks verified |
+| M2 Widget + list | Week 4 | Stories 2.1, 2.2, 3.1 pass | Not started. Change `add-floating-widget-and-task-list` |
+| M3 Pet + reminders (MVP) | Week 6 | Stories 4.1, 6.1 pass; static pet images | Not started. Change `add-pet-mood-and-reminders`; blocked on §11 row 9 |
+| M4 Dogfood week | Week 7 | Owner uses daily; bugs fixed | Not started |
+| M5 Delight release | Week 9 | Animations, tokens, weekly summary | Not started. Change `add-delight-features` |
+| M6 First 4-week review | Week 13 | Decide iterate / expand / roll back | Not started |
 
 `[ASSUMPTION: week numbers assume ≈ 10 h/week starting the week of 2026-09-07.]`
 
