@@ -1,0 +1,62 @@
+schema: spec-driven
+
+context: |
+  Product: Totogotchi, a macOS task manager that lives in a small always-on-top
+  floating widget. A virtual pet's mood reflects how well the user completes the
+  current week's tasks. Source of truth for scope and priorities: docs/PRD.md.
+
+  Stack (PRD §5.1, assumption pending owner confirmation): Swift 5.10+, SwiftUI
+  for views with AppKit interop for the floating panel, global hotkey and menu-bar
+  item; SwiftData for persistence; minimum macOS 14 (Sonoma); App Sandbox and
+  Hardened Runtime enabled; no network entitlement.
+
+  Layers: App shell (AppKit window/panel, status item, hotkey) -> UI (SwiftUI) ->
+  Domain (pure Swift: task store, mood engine, ISO-week calendar, reminder
+  scheduling) -> Persistence (SwiftData). Domain logic must be pure and unit
+  tested; UI and AppKit code stay thin.
+
+  Conventions:
+  - Week = ISO week, Monday to Sunday, in the user's local time zone.
+  - Task priority: high, medium, low. Default medium. Default due date: Sunday
+    23:59 local of the current ISO week.
+  - Deletes are soft (deletedAt) to support 5-second undo.
+  - All data stays on device inside the sandbox container. No telemetry leaves
+    the machine. Usage events are logged locally only.
+  - Accessibility: every action reachable by keyboard, VoiceOver labels on tasks
+    and pet state, state never conveyed by color alone, honor Reduce Motion.
+  - UI text is English for v1.
+
+  Performance budgets (PRD §5.4): cold launch < 1 s on Apple Silicon; hotkey to
+  focused capture field < 150 ms; create/complete to UI update < 100 ms; list
+  render p95 < 100 ms at 1,000 tasks; save p95 < 50 ms; idle CPU < 1%; idle
+  memory < 80 MB; 10,000 tasks without degradation.
+
+  Testing: XCTest unit tests for domain logic (mood engine boundaries, week
+  calendar, token parsing). Acceptance scenarios in specs are the manual QA
+  script. The owner is the only user and stakeholder.
+
+rules:
+  proposal:
+    - Reference the PRD section and story numbers the change implements
+    - List PRD out-of-scope items that a reader might expect, as explicit non-goals
+  specs:
+    - Keep the PRD's measurable targets (ms, %, counts) inside scenarios
+    - Use WHEN/THEN; add GIVEN only when the precondition is not obvious
+    - Describe observable behavior only; no Swift types, frameworks or file paths
+  design:
+    - State alternatives considered for every decision
+    - Map each risk to the PRD §10 risk table where one exists
+  tasks:
+    - Every task names its verification (test, command or observable behavior)
+    - Pure domain logic tasks include writing the unit tests in the same task
+
+operations:
+  apply:
+    guidance:
+      - Do not run xcodebuild or open Xcode unless the owner explicitly asks
+      - Work one task at a time and mark it complete before starting the next
+      - Keep specs unchanged during apply; if behavior must change, stop and propose a spec edit
+  archive:
+    guidance:
+      - Confirm every ADDED requirement landed in openspec/specs/<capability>/spec.md with its Purpose
+      - Update docs/PRD.md §9.3 milestone status when a change is archived
