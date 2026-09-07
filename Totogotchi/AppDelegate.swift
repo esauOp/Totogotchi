@@ -1,13 +1,15 @@
 import AppKit
 import TotogotchiCore
+import UserNotifications
 import os
 
 @MainActor
-final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
+final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, UNUserNotificationCenterDelegate {
     private let log = Logger(subsystem: "com.esauortega.Totogotchi", category: "app")
     private let settings = AppSettings()
 
     lazy var hotKeyController = HotKeyController(settings: settings)
+    private lazy var notificationsController = NotificationsController(settings: settings)
 
     private var statusItem: NSStatusItem?
     private var toggleWidgetItem: NSMenuItem?
@@ -15,6 +17,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     private var widgetModel: WidgetViewModel?
     private var widgetPanel: WidgetPanelController?
     private var capturePanel: CapturePanelController?
+    private var reminders: ReminderScheduler?
     private var storeObservation: TaskStoreObservation?
     private let settingsWindow = SettingsWindowController()
 
@@ -22,9 +25,40 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         installStatusItem()
         openTaskStore()
         showWidgetAtLaunch()
+        // The first pass is the one that reports in summary what came due while
+        // the app was closed, so it has to run before any tick.
+        reminders?.evaluate()
         hotKeyController.activate { [weak self] in
             self?.presentCapture(startedAt: CFAbsoluteTimeGetCurrent())
         }
+    }
+
+    // MARK: - Notifications
+
+    /// Show reminders even when Totogotchi is the active app, which for a
+    /// menu-bar app it briefly is whenever the user touches the widget.
+    func userNotificationCenter(
+        _ center: UNUserNotificationCenter,
+        willPresent notification: UNNotification
+    ) async -> UNNotificationPresentationOptions {
+        [.banner, .sound]
+    }
+
+    func userNotificationCenter(
+        _ center: UNUserNotificationCenter,
+        didReceive response: UNNotificationResponse
+    ) async {
+        let info = response.notification.request.content.userInfo
+        guard let raw = info[ReminderScheduler.taskIdentifierKey] as? String,
+              let id = UUID(uuidString: raw)
+        else {
+            widgetPanel?.show()
+            return
+        }
+        log.info("Opening the widget from a reminder")
+        widgetPanel?.showExpanded()
+        widgetModel?.selection = id
+        refreshStatusItem()
     }
 
     func applicationWillTerminate(_ notification: Notification) {
@@ -42,9 +76,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             let store = TaskStore(repository: repository)
             taskStore = store
 
-            let model = WidgetViewModel(store: store)
+            let model = WidgetViewModel(store: store, settings: settings)
             widgetModel = model
             capturePanel = CapturePanelController(model: CaptureModel(store: store))
+
+            let scheduler = ReminderScheduler(store: store, settings: settings)
+            reminders = scheduler
+            UNUserNotificationCenter.current().delegate = self
+            model.onTick = { scheduler.evaluate() }
+
             widgetPanel = WidgetPanelController(
                 model: model,
                 settings: settings,
@@ -173,6 +213,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
 
     @objc private func openSettings() {
         log.info("Opening settings")
-        settingsWindow.show(controller: hotKeyController)
+        settingsWindow.show(hotKeys: hotKeyController, notifications: notificationsController)
     }
 }

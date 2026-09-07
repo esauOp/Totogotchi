@@ -12,8 +12,8 @@ import SwiftUI
 final class SettingsWindowController {
     private var window: NSWindow?
 
-    func show(controller: HotKeyController) {
-        let window = window ?? makeWindow(controller: controller)
+    func show(hotKeys: HotKeyController, notifications: NotificationsController) {
+        let window = window ?? makeWindow(hotKeys: hotKeys, notifications: notifications)
         self.window = window
 
         // An accessory app has to ask for activation explicitly, or the window
@@ -23,8 +23,8 @@ final class SettingsWindowController {
         window.orderFrontRegardless()
     }
 
-    private func makeWindow(controller: HotKeyController) -> NSWindow {
-        let hosting = NSHostingView(rootView: SettingsView(controller: controller))
+    private func makeWindow(hotKeys: HotKeyController, notifications: NotificationsController) -> NSWindow {
+        let hosting = NSHostingView(rootView: SettingsView(hotKeys: hotKeys, notifications: notifications))
         let window = NSWindow(
             contentRect: NSRect(origin: .zero, size: hosting.fittingSize),
             styleMask: [.titled, .closable, .miniaturizable],

@@ -1,10 +1,10 @@
 import SwiftUI
+import TotogotchiCore
 
 /// The widget shrunk to the pet alone, with a count of what is overdue.
-///
-/// The pet is a placeholder until `add-pet-mood-and-reminders` gives it moods
-/// and artwork.
 struct CollapsedPetView: View {
+    let mood: PetMood
+    let reason: String
     let overdueCount: Int
     let onExpand: () -> Void
 
@@ -14,11 +14,10 @@ struct CollapsedPetView: View {
                 RoundedRectangle(cornerRadius: 18, style: .continuous)
                     .fill(.regularMaterial)
 
-                Image(systemName: "pawprint.circle.fill")
+                Image(mood.assetName)
                     .resizable()
                     .scaledToFit()
-                    .padding(22)
-                    .foregroundStyle(.tint)
+                    .padding(8)
 
                 if overdueCount > 0 {
                     Text("\(overdueCount)")
@@ -34,10 +33,7 @@ struct CollapsedPetView: View {
         }
         .buttonStyle(.plain)
         .frame(width: 120, height: 120)
-        .accessibilityLabel(
-            overdueCount > 0
-                ? "Totogotchi, \(overdueCount) tasks overdue. Click to expand"
-                : "Totogotchi. Click to expand"
-        )
+        .help(reason)
+        .accessibilityLabel("Totogotchi. \(mood.displayName). \(reason) Click to expand.")
     }
 }

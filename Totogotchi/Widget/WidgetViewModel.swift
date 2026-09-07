@@ -13,6 +13,12 @@ final class WidgetViewModel: ObservableObject {
     static let undoWindow: TimeInterval = TaskStore.undoWindow
 
     @Published private(set) var weekView: WeekView
+    @Published private(set) var petState: PetState
+    /// A short-lived mood that overrides the computed one, used for the cheer
+    /// when a task is completed.
+    @Published private(set) var reaction: PetMood?
+    /// The week whose congratulation banner is on screen, if any.
+    @Published private(set) var celebratingWeek: ISOWeek?
     @Published var selection: UUID?
     @Published private(set) var editingID: UUID?
     @Published var editText: String = ""
@@ -25,24 +31,39 @@ final class WidgetViewModel: ObservableObject {
         let title: String
     }
 
+    /// How long the cheer plays before the pet returns to its computed mood.
+    static let reactionDuration: TimeInterval = 1.5
+
     private let store: TaskStore
+    private let settings: AppSettings
     private let log = Logger(subsystem: "com.esauortega.Totogotchi", category: "widget")
     private var observation: TaskStoreObservation?
     private var tick: Timer?
     private var undoTimer: Timer?
+    private var reactionTimer: Timer?
 
-    init(store: TaskStore) {
+    init(store: TaskStore, settings: AppSettings) {
         self.store = store
-        weekView = (try? store.weekView()) ?? WeekView(week: ISOWeek(year: 0, week: 0), overdue: [], thisWeek: [], completed: [])
+        self.settings = settings
+        let emptyWeek = WeekView(week: ISOWeek(year: 0, week: 0), overdue: [], thisWeek: [], completed: [])
+        weekView = (try? store.weekView()) ?? emptyWeek
+        petState = (try? store.petState())
+            ?? MoodEngine.evaluate(weekView: emptyWeek, streakDays: 0)
         observation = store.observeChanges { [weak self] in
             MainActor.assumeIsolated { self?.refresh() }
         }
+        updateCelebrationBanner()
     }
 
     deinit {
         tick?.invalidate()
         undoTimer?.invalidate()
+        reactionTimer?.invalidate()
     }
+
+    /// The mood actually on screen: the cheer while it lasts, otherwise the
+    /// mood the engine computed.
+    var displayedMood: PetMood { reaction ?? petState.mood }
 
     // MARK: - Refreshing
 
@@ -50,30 +71,49 @@ final class WidgetViewModel: ObservableObject {
         let started = CFAbsoluteTimeGetCurrent()
         do {
             weekView = try store.weekView()
+            petState = try store.petState()
+            updateCelebrationBanner()
             let elapsed = (CFAbsoluteTimeGetCurrent() - started) * 1_000
-            log.info("Week view rebuilt in \(elapsed, format: .fixed(precision: 2)) ms for \(self.weekView.openCount + self.weekView.completedCount) tasks")
+            log.info("Week view and mood rebuilt in \(elapsed, format: .fixed(precision: 2)) ms; mood \(self.petState.mood.rawValue, privacy: .public)")
         } catch {
             log.error("Could not build the week view: \(String(describing: error), privacy: .public)")
         }
     }
 
-    /// Starts the one-minute tick. Called when the widget begins showing a list.
+    /// Run on every tick, after the refresh. The reminder check rides here so
+    /// there is only ever one timer.
+    var onTick: (() -> Void)?
+
+    /// Starts the one-minute tick. Called whenever the widget is on screen,
+    /// collapsed or expanded, because the pet and its overdue badge both go
+    /// stale otherwise.
+    ///
+    /// Driven by `WidgetPanelController`, never by a view's `onAppear`. Swapping
+    /// the panel's content view fires the old view's `onDisappear` and the new
+    /// one's `onAppear` in an order SwiftUI does not promise, and a stop that
+    /// landed after the matching start left the widget frozen.
     func startClock() {
         guard tick == nil else { return }
         let timer = Timer(timeInterval: 60, repeats: true) { [weak self] _ in
-            MainActor.assumeIsolated { self?.refresh() }
+            MainActor.assumeIsolated {
+                self?.refresh()
+                self?.onTick?()
+            }
         }
         // The common run loop mode keeps it firing while a menu or a resize is
         // tracking, so the list cannot go stale mid-interaction.
         RunLoop.main.add(timer, forMode: .common)
         tick = timer
+        log.info("Clock started")
         refresh()
     }
 
     /// Stops the tick while nothing is on screen to update.
     func stopClock() {
+        guard tick != nil else { return }
         tick?.invalidate()
         tick = nil
+        log.info("Clock stopped")
     }
 
     // MARK: - Derived text
@@ -96,12 +136,49 @@ final class WidgetViewModel: ObservableObject {
                 _ = try store.uncomplete(task.id)
             } else {
                 _ = try store.complete(task.id)
+                cheer()
             }
             let elapsed = (CFAbsoluteTimeGetCurrent() - started) * 1_000
             log.info("Toggled completion in \(elapsed, format: .fixed(precision: 1)) ms")
         } catch {
             log.error("Could not change completion: \(String(describing: error), privacy: .public)")
         }
+    }
+
+    // MARK: - Pet
+
+    /// Shows the celebrating sloth briefly, then hands the pet back to whatever
+    /// the engine says. Modelled as an override so the engine stays a pure
+    /// function of the data.
+    private func cheer() {
+        reactionTimer?.invalidate()
+        reaction = .celebrating
+        reactionTimer = Timer.scheduledTimer(withTimeInterval: Self.reactionDuration, repeats: false) { [weak self] _ in
+            MainActor.assumeIsolated {
+                self?.reaction = nil
+                self?.reactionTimer = nil
+            }
+        }
+    }
+
+    /// Raises the banner the first time a week is completed, and never again
+    /// that week once it has been dismissed.
+    private func updateCelebrationBanner() {
+        guard petState.mood == .celebrating else {
+            celebratingWeek = nil
+            return
+        }
+        let week = weekView.week
+        guard settings.celebrationDismissedWeek != week else {
+            celebratingWeek = nil
+            return
+        }
+        celebratingWeek = week
+    }
+
+    func dismissCelebration() {
+        settings.celebrationDismissedWeek = weekView.week
+        celebratingWeek = nil
     }
 
     func completeSelection() {

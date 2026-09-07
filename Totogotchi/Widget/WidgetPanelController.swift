@@ -108,7 +108,7 @@ final class WidgetPanelController: NSObject, NSWindowDelegate {
         applyContent()
         applyFrame()
         panel.orderFrontRegardless()
-        if isCollapsed { model.stopClock() } else { model.startClock() }
+        model.startClock()
         logFirstFrameIfNeeded()
     }
 
@@ -122,6 +122,14 @@ final class WidgetPanelController: NSObject, NSWindowDelegate {
         isVisible ? hide() : show()
     }
 
+    /// Brings the widget up with its list showing, expanding it first if it was
+    /// folded away. Used when a reminder is clicked and there is a task to point
+    /// at.
+    func showExpanded() {
+        if isCollapsed { toggleCollapsed() }
+        show()
+    }
+
     // MARK: - Collapsing
 
     func toggleCollapsed() {
@@ -130,7 +138,6 @@ final class WidgetPanelController: NSObject, NSWindowDelegate {
         settings.isWidgetCollapsed = isCollapsed
         applyContent()
         applyFrame()
-        if isCollapsed { model.stopClock() } else { model.startClock() }
     }
 
     // MARK: - Content
@@ -140,7 +147,11 @@ final class WidgetPanelController: NSObject, NSWindowDelegate {
         if isCollapsed {
             hosting = NSHostingView(
                 rootView: AnyView(
-                    CollapsedPetView(overdueCount: model.overdueCount) { [weak self] in
+                    CollapsedPetView(
+                        mood: model.displayedMood,
+                        reason: model.petState.reason,
+                        overdueCount: model.overdueCount
+                    ) { [weak self] in
                         self?.toggleCollapsed()
                     }
                 )

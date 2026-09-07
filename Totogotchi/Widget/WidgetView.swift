@@ -11,6 +11,10 @@ struct WidgetView: View {
     var body: some View {
         VStack(spacing: 0) {
             header
+            if model.celebratingWeek != nil {
+                Divider()
+                celebrationBanner
+            }
             Divider()
             list
             if let undo = model.pendingUndo {
@@ -21,20 +25,14 @@ struct WidgetView: View {
             footer
         }
         .background(Color(nsColor: .windowBackgroundColor))
-        .onAppear { model.startClock() }
-        .onDisappear { model.stopClock() }
     }
 
     // MARK: - Header
 
     private var header: some View {
         HStack(spacing: 10) {
-            Image(systemName: "pawprint.circle.fill")
-                .resizable()
-                .scaledToFit()
-                .frame(height: 44)
-                .foregroundStyle(.tint)
-                .accessibilityHidden(true)
+            PetView(mood: model.displayedMood, reason: model.petState.reason)
+                .frame(height: 52)
 
             VStack(alignment: .leading, spacing: 1) {
                 Text("Totogotchi").font(.headline)
@@ -128,6 +126,24 @@ struct WidgetView: View {
             model.deleteSelection()
             return .handled
         }
+    }
+
+    // MARK: - Celebration
+
+    private var celebrationBanner: some View {
+        HStack(spacing: 8) {
+            Text("Week clear. Every task done.")
+                .font(.callout.weight(.medium))
+            Spacer(minLength: 0)
+            Button("Dismiss") { model.dismissCelebration() }
+                .buttonStyle(.link)
+                .font(.caption)
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 8)
+        .background(Color.accentColor.opacity(0.12))
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("Every task due this week is done")
     }
 
     // MARK: - Undo
