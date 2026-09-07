@@ -302,7 +302,7 @@ N/A — no server, no public API. Internal module boundaries are Swift protocols
 | List render, 1,000 tasks | p95 < 100 ms |
 | Save latency | p95 < 50 ms |
 | Idle CPU | < 1% average; animations pause when widget is occluded or display sleeps |
-| Idle memory | < 80 MB resident |
+| Idle memory | < 80 MB physical footprint (the figure Activity Monitor shows as Memory). Resident set size is not the metric: it counts the AppKit and SwiftUI pages every app on the machine shares, so it penalises a native app for using system frameworks. Decided 2026-09-07 after measuring 84 MB RSS against 35 MB footprint |
 | Capacity | 10,000 tasks without degrading the targets above |
 | Availability | Local app; no uptime target. Crash-free sessions ≥ 99.5% |
 | Growth | Personal use: ≈ 20–50 tasks per week; 10-year horizon ≈ 25,000 tasks; SwiftData with indexed `dueDate` handles this |

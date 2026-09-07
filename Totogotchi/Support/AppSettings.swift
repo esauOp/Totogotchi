@@ -1,3 +1,4 @@
+import AppKit
 import Foundation
 
 /// User preferences, stored in the app's sandboxed defaults.
@@ -5,6 +6,30 @@ final class AppSettings {
     private enum Key {
         static let hotKey = "hotKey"
         static let fallbackNoticeShownFor = "fallbackNoticeShownFor"
+        static let widgetFrame = "widgetFrame"
+        static let widgetCollapsed = "widgetCollapsed"
+    }
+
+    /// The expanded widget's frame. Collapsing does not overwrite it, so
+    /// expanding again restores the exact size the user chose.
+    var widgetFrame: NSRect? {
+        get {
+            guard let text = defaults.string(forKey: Key.widgetFrame) else { return nil }
+            let rect = NSRectFromString(text)
+            return rect.isEmpty ? nil : rect
+        }
+        set {
+            guard let newValue else {
+                defaults.removeObject(forKey: Key.widgetFrame)
+                return
+            }
+            defaults.set(NSStringFromRect(newValue), forKey: Key.widgetFrame)
+        }
+    }
+
+    var isWidgetCollapsed: Bool {
+        get { defaults.bool(forKey: Key.widgetCollapsed) }
+        set { defaults.set(newValue, forKey: Key.widgetCollapsed) }
     }
 
     private let defaults: UserDefaults
