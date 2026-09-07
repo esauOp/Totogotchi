@@ -52,6 +52,22 @@ public struct WeekCalendar: Sendable {
         endOfWeek(containing: now)
     }
 
+    /// Midnight at the start of the day holding `date`.
+    public func startOfDay(for date: Date) -> Date {
+        calendar.startOfDay(for: date)
+    }
+
+    /// Midnight at the start of the previous day.
+    ///
+    /// Calendar arithmetic rather than subtracting 86,400 seconds, so the days a
+    /// daylight-saving change shortens or lengthens still step correctly.
+    public func dayBefore(_ date: Date) -> Date {
+        guard let previous = calendar.date(byAdding: .day, value: -1, to: startOfDay(for: date)) else {
+            preconditionFailure("Could not step back a day from \(date)")
+        }
+        return startOfDay(for: previous)
+    }
+
     /// The ISO week-based year and week number for `date`.
     public func isoWeek(of date: Date) -> ISOWeek {
         ISOWeek(

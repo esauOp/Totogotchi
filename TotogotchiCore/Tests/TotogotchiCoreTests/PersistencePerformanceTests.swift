@@ -105,3 +105,48 @@ struct WeekViewPerformanceTests {
         }
     }
 }
+
+@Suite("Pet state performance")
+struct PetStatePerformanceTests {
+
+    private let now = makeDate(2026, 9, 9, 10, 0)
+
+    @Test("Deriving the pet state stays under 100 ms at p95 with a thousand tasks stored")
+    func petStateLatency() throws {
+        try withTemporaryDirectory { directory in
+            let repository = try SwiftDataTaskRepository(url: directory.appendingPathComponent("Pet.store"))
+            let store = TaskStore(repository: repository, week: WeekCalendar(timeZone: TZ.utc), clock: { self.now })
+
+            // Two years of history, so the streak walk meets its 365-day cap
+            // rather than stopping early.
+            for index in 0..<1_000 {
+                let due = now.addingTimeInterval(-Double(index) * 43_200)
+                var task = try TaskItem(
+                    title: "Task \(index)",
+                    dueDate: due,
+                    createdAt: now.addingTimeInterval(-730 * 86_400)
+                )
+                if !index.isMultiple(of: 4) { task.markCompleted(at: due, now: due.addingTimeInterval(1)) }
+                try store.replaceForTesting(task)
+            }
+
+            var samples: [Double] = []
+            for _ in 0..<50 {
+                let start = Date()
+                _ = try store.petState()
+                samples.append(Date().timeIntervalSince(start) * 1_000)
+            }
+
+            let p95 = percentile95(samples)
+            print(
+                """
+                [perf] pet state over 1,000 tasks: \
+                median \(String(format: "%.2f", samples.sorted()[samples.count / 2])) ms, \
+                p95 \(String(format: "%.2f", p95)) ms, \
+                max \(String(format: "%.2f", samples.max() ?? 0)) ms
+                """
+            )
+            #expect(p95 < 100)
+        }
+    }
+}

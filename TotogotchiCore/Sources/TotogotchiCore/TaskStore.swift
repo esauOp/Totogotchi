@@ -74,6 +74,66 @@ public final class TaskStore {
         try repository.fetch(id: id)
     }
 
+    // MARK: - Pet state
+
+    /// How far back `streakDays(now:)` looks, so a long history cannot make the
+    /// walk unbounded.
+    public static let maximumStreakDays = 365
+
+    /// Consecutive days, counting back from `now`, on which the user either
+    /// completed something or had nothing due.
+    ///
+    /// Today never breaks the streak while it is still in progress: work due
+    /// today that has not been done yet has not failed yet.
+    ///
+    /// Counting stops at the day the user's first task was created. Without that
+    /// floor every day before the app existed would count as "nothing was due",
+    /// and an empty store would report a year-long streak.
+    public func streakDays(now: Date? = nil) throws -> Int {
+        let moment = now ?? clock()
+        let tasks = try activeTasks()
+        guard let firstDay = tasks.map({ week.startOfDay(for: $0.createdAt) }).min() else {
+            return 0
+        }
+
+        var completionDays: Set<Date> = []
+        var dueDays: Set<Date> = []
+        for task in tasks {
+            if let completedAt = task.completedAt {
+                completionDays.insert(week.startOfDay(for: completedAt))
+            }
+            dueDays.insert(week.startOfDay(for: task.dueDate))
+        }
+
+        let today = week.startOfDay(for: moment)
+        var day = today
+        var streak = 0
+
+        for _ in 0..<Self.maximumStreakDays {
+            if day < firstDay { break }
+            let kept = completionDays.contains(day) || !dueDays.contains(day)
+            if kept {
+                streak += 1
+            } else if day != today {
+                break
+            }
+            day = week.dayBefore(day)
+        }
+        return streak
+    }
+
+    /// The pet's current state.
+    ///
+    /// Derived on demand rather than stored, so it can never drift from the
+    /// tasks it describes.
+    public func petState(now: Date? = nil) throws -> PetState {
+        let moment = now ?? clock()
+        return MoodEngine.evaluate(
+            weekView: try weekView(now: moment),
+            streakDays: try streakDays(now: moment)
+        )
+    }
+
     // MARK: - Writing
 
     /// Creates a task. Priority defaults to medium and the due date to the end of
