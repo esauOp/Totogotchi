@@ -29,6 +29,34 @@ public final class TaskStore {
         self.clock = clock
     }
 
+    /// The calendar the store was built with, so callers derive weeks the same way.
+    var weekCalendar: WeekCalendar { week }
+
+    /// The store's notion of now.
+    func currentDate() -> Date { clock() }
+
+    // MARK: - Change notification
+
+    /// Advances on every mutation. Useful as a cheap "did anything change" check.
+    public private(set) var revision: Int = 0
+
+    private var observers: [UUID: () -> Void] = [:]
+
+    /// Calls `handler` after every mutation, until the returned token is released
+    /// or invalidated.
+    public func observeChanges(_ handler: @escaping () -> Void) -> TaskStoreObservation {
+        let id = UUID()
+        observers[id] = handler
+        return TaskStoreObservation { [weak self] in
+            self?.observers.removeValue(forKey: id)
+        }
+    }
+
+    private func recordChange() {
+        revision &+= 1
+        for handler in observers.values { handler() }
+    }
+
     // MARK: - Reading
 
     /// Tasks that are not soft-deleted, including completed ones.
@@ -68,6 +96,7 @@ public final class TaskStore {
             recurrence: recurrence
         )
         try repository.upsert(task)
+        recordChange()
         return task
     }
 
@@ -76,6 +105,7 @@ public final class TaskStore {
         var task = try require(id)
         try task.rename(to: newTitle)
         try repository.upsert(task)
+        recordChange()
         return task
     }
 
@@ -85,6 +115,7 @@ public final class TaskStore {
         var task = try require(id)
         task.markCompleted(at: now, now: now)
         try repository.upsert(task)
+        recordChange()
         return task
     }
 
@@ -93,6 +124,7 @@ public final class TaskStore {
         var task = try require(id)
         task.markIncomplete()
         try repository.upsert(task)
+        recordChange()
         return task
     }
 
@@ -102,6 +134,7 @@ public final class TaskStore {
         var task = try require(id)
         task.markDeleted(at: clock())
         try repository.upsert(task)
+        recordChange()
     }
 
     @discardableResult
@@ -109,6 +142,7 @@ public final class TaskStore {
         var task = try require(id)
         task.restore()
         try repository.upsert(task)
+        recordChange()
         return task
     }
 
@@ -125,6 +159,7 @@ public final class TaskStore {
             .map(\.id)
         guard !expired.isEmpty else { return 0 }
         try repository.remove(ids: expired)
+        recordChange()
         return expired.count
     }
 
@@ -146,6 +181,7 @@ public final class TaskStore {
     /// Writes a task verbatim, without touching timestamps or validation.
     func replace(_ task: TaskItem) throws {
         try repository.upsert(task)
+        recordChange()
     }
 
     var exportClock: () -> Date { clock }
