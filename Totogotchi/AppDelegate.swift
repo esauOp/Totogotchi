@@ -10,6 +10,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, UNUser
 
     lazy var hotKeyController = HotKeyController(settings: settings)
     private lazy var notificationsController = NotificationsController(settings: settings)
+    private lazy var launchAtLoginController = LaunchAtLoginController()
+    private var transferController: DataTransferController?
 
     private var statusItem: NSStatusItem?
     private var toggleWidgetItem: NSMenuItem?
@@ -87,6 +89,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, UNUser
 
             let statsCounters = try SwiftDataWeeklyStatsRepository(url: url)
             counters = statsCounters
+            transferController = DataTransferController(
+                store: store,
+                usage: usageLog,
+                counters: statsCounters
+            )
 
             let model = WidgetViewModel(
                 store: store,
@@ -249,6 +256,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, UNUser
 
     @objc private func openSettings() {
         log.info("Opening settings")
-        settingsWindow.show(hotKeys: hotKeyController, notifications: notificationsController)
+        guard let transferController else {
+            log.error("Settings opened before the store was ready")
+            return
+        }
+        settingsWindow.show(
+            hotKeys: hotKeyController,
+            notifications: notificationsController,
+            transfer: transferController,
+            launchAtLogin: launchAtLoginController
+        )
     }
 }
