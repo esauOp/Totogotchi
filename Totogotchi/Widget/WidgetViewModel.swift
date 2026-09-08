@@ -19,6 +19,18 @@ final class WidgetViewModel: ObservableObject {
     @Published private(set) var reaction: PetMood?
     /// The week whose congratulation banner is on screen, if any.
     @Published private(set) var celebratingWeek: ISOWeek?
+    /// False while the widget is covered, hidden, or on another Space. The pet
+    /// holds still rather than burning frames nobody can see.
+    @Published var isPetAnimating = true
+    /// True for a few seconds after something happened worth reacting to.
+    ///
+    /// The pet does not loop an idle: continuous motion in the floating panel
+    /// costs about 5% CPU whatever is animated, which the idle budget cannot
+    /// absorb. It stirs on a mood change, on a completion and while capture is
+    /// open, then settles.
+    @Published private(set) var isPetStirring = false
+    /// True while the capture field is open, which leans the pet towards it.
+    @Published var isCapturing = false
     @Published var selection: UUID?
     @Published private(set) var editingID: UUID?
     @Published var editText: String = ""
@@ -36,15 +48,18 @@ final class WidgetViewModel: ObservableObject {
 
     private let store: TaskStore
     private let settings: AppSettings
+    private let usage: UsageLog
     private let log = Logger(subsystem: "com.esauortega.Totogotchi", category: "widget")
     private var observation: TaskStoreObservation?
     private var tick: Timer?
     private var undoTimer: Timer?
     private var reactionTimer: Timer?
+    private var stirTimer: Timer?
 
-    init(store: TaskStore, settings: AppSettings) {
+    init(store: TaskStore, settings: AppSettings, usage: UsageLog) {
         self.store = store
         self.settings = settings
+        self.usage = usage
         let emptyWeek = WeekView(week: ISOWeek(year: 0, week: 0), overdue: [], thisWeek: [], completed: [])
         weekView = (try? store.weekView()) ?? emptyWeek
         petState = (try? store.petState())
@@ -59,6 +74,7 @@ final class WidgetViewModel: ObservableObject {
         tick?.invalidate()
         undoTimer?.invalidate()
         reactionTimer?.invalidate()
+        stirTimer?.invalidate()
     }
 
     /// The mood actually on screen: the cheer while it lasts, otherwise the
@@ -71,7 +87,12 @@ final class WidgetViewModel: ObservableObject {
         let started = CFAbsoluteTimeGetCurrent()
         do {
             weekView = try store.weekView()
+            let previousMood = petState.mood
             petState = try store.petState()
+            if petState.mood != previousMood {
+                stirPet()
+                usage.record(.moodChanged, previousMood: previousMood, newMood: petState.mood)
+            }
             updateCelebrationBanner()
             let elapsed = (CFAbsoluteTimeGetCurrent() - started) * 1_000
             log.info("Week view and mood rebuilt in \(elapsed, format: .fixed(precision: 2)) ms; mood \(self.petState.mood.rawValue, privacy: .public)")
@@ -136,6 +157,7 @@ final class WidgetViewModel: ObservableObject {
                 _ = try store.uncomplete(task.id)
             } else {
                 _ = try store.complete(task.id)
+                usage.record(.taskCompleted, taskID: task.id)
                 cheer()
             }
             let elapsed = (CFAbsoluteTimeGetCurrent() - started) * 1_000
@@ -153,10 +175,26 @@ final class WidgetViewModel: ObservableObject {
     private func cheer() {
         reactionTimer?.invalidate()
         reaction = .celebrating
+        stirPet()
         reactionTimer = Timer.scheduledTimer(withTimeInterval: Self.reactionDuration, repeats: false) { [weak self] _ in
             MainActor.assumeIsolated {
                 self?.reaction = nil
                 self?.reactionTimer = nil
+            }
+        }
+    }
+
+    /// How long the pet keeps moving after something happens.
+    static let stirDuration: TimeInterval = 3.0
+
+    /// Sets the pet moving, and arranges for it to settle again.
+    private func stirPet() {
+        stirTimer?.invalidate()
+        isPetStirring = true
+        stirTimer = Timer.scheduledTimer(withTimeInterval: Self.stirDuration, repeats: false) { [weak self] _ in
+            MainActor.assumeIsolated {
+                self?.isPetStirring = false
+                self?.stirTimer = nil
             }
         }
     }
@@ -225,6 +263,7 @@ final class WidgetViewModel: ObservableObject {
         finishUndoWindow()
         do {
             try store.delete(task.id)
+            usage.record(.taskDeleted, taskID: task.id)
             pendingUndo = PendingUndo(id: task.id, title: task.title)
             if selection == task.id { selection = nil }
             undoTimer = Timer.scheduledTimer(withTimeInterval: Self.undoWindow, repeats: false) { [weak self] _ in

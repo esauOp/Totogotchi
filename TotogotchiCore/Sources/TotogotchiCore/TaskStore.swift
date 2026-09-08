@@ -160,6 +160,24 @@ public final class TaskStore {
         return task
     }
 
+    /// Reads capture text without creating anything, for the live preview beside
+    /// the field. Uses the store's own calendar and clock so the preview cannot
+    /// disagree with what pressing Enter will do.
+    public func parseCapture(_ text: String) -> ParsedCapture {
+        CaptureTokens.parse(text, now: clock(), calendar: week)
+    }
+
+    /// Creates a task from a line of capture text, applying any tokens in it.
+    @discardableResult
+    public func createFromCapture(_ text: String) throws -> TaskItem {
+        let parsed = parseCapture(text)
+        return try create(
+            title: parsed.title,
+            priority: parsed.priority ?? .medium,
+            dueDate: parsed.dueDate
+        )
+    }
+
     @discardableResult
     public func rename(_ id: UUID, to newTitle: String) throws -> TaskItem {
         var task = try require(id)

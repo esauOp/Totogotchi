@@ -41,7 +41,13 @@ public final class SwiftDataTaskRepository: TaskRepository {
     }
 
     public init(configuration: ModelConfiguration) throws {
-        container = try ModelContainer(for: TaskRecord.self, configurations: configuration)
+        // Both models are declared here because tasks and usage events share
+        // one store file; a container that knew only half the schema would
+        // fight the other one.
+        container = try ModelContainer(
+            for: TaskRecord.self, UsageEventRecord.self,
+            configurations: configuration
+        )
         context = ModelContext(container)
         // Saves are explicit so a mutation cannot be reported as durable before
         // it has actually been written.

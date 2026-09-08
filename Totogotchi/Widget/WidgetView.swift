@@ -31,8 +31,14 @@ struct WidgetView: View {
 
     private var header: some View {
         HStack(spacing: 10) {
-            PetView(mood: model.displayedMood, reason: model.petState.reason)
-                .frame(height: 52)
+            PetView(
+                mood: model.displayedMood,
+                reason: model.petState.reason,
+                isAnimating: model.isPetAnimating,
+                isStirring: model.isPetStirring,
+                isAttentive: model.isCapturing
+            )
+            .frame(height: 52)
 
             VStack(alignment: .leading, spacing: 1) {
                 Text("Totogotchi").font(.headline)

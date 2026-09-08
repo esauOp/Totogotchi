@@ -2,10 +2,12 @@ import SwiftUI
 import TotogotchiCore
 
 /// The widget shrunk to the pet alone, with a count of what is overdue.
+///
+/// Observes the model rather than taking a snapshot: the panel's content view is
+/// built once when the widget collapses, so fixed values would leave the pet
+/// showing whatever mood it happened to hold at that moment.
 struct CollapsedPetView: View {
-    let mood: PetMood
-    let reason: String
-    let overdueCount: Int
+    @ObservedObject var model: WidgetViewModel
     let onExpand: () -> Void
 
     var body: some View {
@@ -14,13 +16,17 @@ struct CollapsedPetView: View {
                 RoundedRectangle(cornerRadius: 18, style: .continuous)
                     .fill(.regularMaterial)
 
-                Image(mood.assetName)
-                    .resizable()
-                    .scaledToFit()
-                    .padding(8)
+                PetView(
+                    mood: model.displayedMood,
+                    reason: model.petState.reason,
+                    isAnimating: model.isPetAnimating,
+                    isStirring: model.isPetStirring,
+                    isAttentive: model.isCapturing
+                )
+                .padding(8)
 
-                if overdueCount > 0 {
-                    Text("\(overdueCount)")
+                if model.overdueCount > 0 {
+                    Text("\(model.overdueCount)")
                         .font(.caption.bold())
                         .monospacedDigit()
                         .foregroundStyle(.white)
@@ -33,7 +39,9 @@ struct CollapsedPetView: View {
         }
         .buttonStyle(.plain)
         .frame(width: 120, height: 120)
-        .help(reason)
-        .accessibilityLabel("Totogotchi. \(mood.displayName). \(reason) Click to expand.")
+        .help(model.petState.reason)
+        .accessibilityLabel(
+            "Totogotchi. \(model.displayedMood.displayName). \(model.petState.reason) Click to expand."
+        )
     }
 }

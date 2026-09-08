@@ -61,8 +61,27 @@ final class WidgetPanelController: NSObject, NSWindowDelegate {
 
         super.init()
         panel.delegate = self
+        observeOcclusion()
         applyContent()
         applyFrame()
+    }
+
+    /// AppKit tells us when the panel is fully covered, hidden, or on another
+    /// Space. That is exactly the signal the animation spec describes, and it
+    /// costs nothing to watch.
+    private func observeOcclusion() {
+        NotificationCenter.default.addObserver(
+            forName: NSWindow.didChangeOcclusionStateNotification,
+            object: panel,
+            queue: .main
+        ) { [weak self] _ in
+            MainActor.assumeIsolated {
+                guard let self else { return }
+                let visible = self.panel.occlusionState.contains(.visible)
+                self.model.isPetAnimating = visible
+                self.log.info("Pet animation \(visible ? "resumed" : "paused", privacy: .public)")
+            }
+        }
     }
 
     var isVisible: Bool { panel.isVisible }
@@ -147,11 +166,7 @@ final class WidgetPanelController: NSObject, NSWindowDelegate {
         if isCollapsed {
             hosting = NSHostingView(
                 rootView: AnyView(
-                    CollapsedPetView(
-                        mood: model.displayedMood,
-                        reason: model.petState.reason,
-                        overdueCount: model.overdueCount
-                    ) { [weak self] in
+                    CollapsedPetView(model: model) { [weak self] in
                         self?.toggleCollapsed()
                     }
                 )

@@ -68,6 +68,37 @@ public struct WeekCalendar: Sendable {
         return startOfDay(for: previous)
     }
 
+    /// One second before midnight on the day holding `date`, which is when a
+    /// task captured for "today" falls due.
+    public func endOfDay(for date: Date) -> Date {
+        guard let interval = calendar.dateInterval(of: .day, for: date) else {
+            preconditionFailure("No day interval for \(date)")
+        }
+        return interval.end.addingTimeInterval(-1)
+    }
+
+    /// Midnight at the start of the following day.
+    public func dayAfter(_ date: Date) -> Date {
+        guard let next = calendar.date(byAdding: .day, value: 1, to: startOfDay(for: date)) else {
+            preconditionFailure("Could not step forward a day from \(date)")
+        }
+        return startOfDay(for: next)
+    }
+
+    /// The next date falling on `weekday`, counting today as a match.
+    ///
+    /// Gregorian weekday numbers, Sunday being 1. "Including today" is what
+    /// makes `@fri` typed on a Friday mean today rather than a week away.
+    public func nextOccurrence(ofWeekday weekday: Int, onOrAfter date: Date) -> Date {
+        let start = startOfDay(for: date)
+        let current = calendar.component(.weekday, from: start)
+        let offset = (weekday - current + 7) % 7
+        guard let result = calendar.date(byAdding: .day, value: offset, to: start) else {
+            preconditionFailure("Could not add \(offset) days to \(start)")
+        }
+        return result
+    }
+
     /// The ISO week-based year and week number for `date`.
     public func isoWeek(of date: Date) -> ISOWeek {
         ISOWeek(

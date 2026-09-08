@@ -1,5 +1,6 @@
 import AppKit
 import SwiftUI
+import TotogotchiCore
 import os
 
 /// A borderless panel that floats above other apps and takes keyboard focus
@@ -22,6 +23,9 @@ final class CapturePanelController {
     private let model: CaptureModel
     private let log = Logger(subsystem: "com.esauortega.Totogotchi", category: "capture")
     private var previousApp: NSRunningApplication?
+
+    /// Called with true when the field opens and false when it closes.
+    var onVisibilityChanged: ((Bool) -> Void)?
 
     init(model: CaptureModel) {
         self.model = model
@@ -50,7 +54,8 @@ final class CapturePanelController {
     ///
     /// `startedAt` comes from the hot key handler so the log records the full
     /// press-to-focus latency the spec budgets at 150 ms.
-    func present(startedAt: CFAbsoluteTime) {
+    func present(startedAt: CFAbsoluteTime, source: TaskSource = .hotkey) {
+        model.source = source
         if panel.isVisible {
             NotificationCenter.default.post(name: .captureFieldShouldFocus, object: nil)
             panel.makeKeyAndOrderFront(nil)
@@ -63,6 +68,7 @@ final class CapturePanelController {
         panel.makeKeyAndOrderFront(nil)
         NotificationCenter.default.post(name: .captureFieldShouldFocus, object: nil)
 
+        onVisibilityChanged?(true)
         let elapsed = (CFAbsoluteTimeGetCurrent() - startedAt) * 1_000
         log.info("Capture focused \(elapsed, format: .fixed(precision: 1)) ms after the hot key")
     }
@@ -70,6 +76,7 @@ final class CapturePanelController {
     func hide(restoringFocus: Bool) {
         guard panel.isVisible else { return }
         panel.orderOut(nil)
+        onVisibilityChanged?(false)
         guard restoringFocus, let previousApp, previousApp != .current else { return }
         previousApp.activate()
         self.previousApp = nil

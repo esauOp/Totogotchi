@@ -26,17 +26,3 @@ extension PetMood {
         }
     }
 }
-
-/// The sloth, at whatever size it is given.
-struct PetView: View {
-    let mood: PetMood
-    let reason: String
-
-    var body: some View {
-        Image(mood.assetName)
-            .resizable()
-            .scaledToFit()
-            .help(reason)
-            .accessibilityLabel("\(mood.displayName). \(reason)")
-    }
-}

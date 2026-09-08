@@ -20,6 +20,7 @@ final class ReminderScheduler {
 
     private let store: TaskStore
     private let settings: AppSettings
+    private let usage: UsageLog
     private let center: UNUserNotificationCenter
     private let log = Logger(subsystem: "com.esauortega.Totogotchi", category: "reminders")
 
@@ -27,9 +28,10 @@ final class ReminderScheduler {
     /// task as it comes due.
     private var hasRunLaunchPass = false
 
-    init(store: TaskStore, settings: AppSettings, center: UNUserNotificationCenter = .current()) {
+    init(store: TaskStore, settings: AppSettings, usage: UsageLog, center: UNUserNotificationCenter = .current()) {
         self.store = store
         self.settings = settings
+        self.usage = usage
         self.center = center
     }
 
@@ -82,6 +84,7 @@ final class ReminderScheduler {
                 log.error("Could not post a reminder: \(String(describing: error), privacy: .public)")
             }
         }
+        usage.record(.notificationShown, taskID: task.id)
         log.info("Posted a reminder for a task due at \(task.dueDate, privacy: .public)")
     }
 
@@ -105,6 +108,7 @@ final class ReminderScheduler {
                 log.error("Could not post the summary: \(String(describing: error), privacy: .public)")
             }
         }
+        for task in tasks { usage.record(.notificationShown, taskID: task.id) }
         log.info("Posted a launch summary for \(tasks.count) tasks")
     }
 

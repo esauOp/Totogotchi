@@ -14,6 +14,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, UNUser
     private var statusItem: NSStatusItem?
     private var toggleWidgetItem: NSMenuItem?
     private var taskStore: TaskStore?
+    private var usage: UsageLog?
     private var widgetModel: WidgetViewModel?
     private var widgetPanel: WidgetPanelController?
     private var capturePanel: CapturePanelController?
@@ -55,6 +56,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, UNUser
             widgetPanel?.show()
             return
         }
+        usage?.record(.notificationClicked, taskID: id)
         log.info("Opening the widget from a reminder")
         widgetPanel?.showExpanded()
         widgetModel?.selection = id
@@ -62,6 +64,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, UNUser
     }
 
     func applicationWillTerminate(_ notification: Notification) {
+        usage?.record(.appQuit)
         // Every write is already synchronous, so the only thing left to keep is
         // where the user parked the widget.
         widgetPanel?.persistState()
@@ -76,11 +79,20 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, UNUser
             let store = TaskStore(repository: repository)
             taskStore = store
 
-            let model = WidgetViewModel(store: store, settings: settings)
-            widgetModel = model
-            capturePanel = CapturePanelController(model: CaptureModel(store: store))
+            // Tasks and events share one store file, so one backup carries both.
+            let usageLog = UsageLog(repository: try SwiftDataUsageLogRepository(url: url))
+            usage = usageLog
+            usageLog.record(.appLaunched)
 
-            let scheduler = ReminderScheduler(store: store, settings: settings)
+            let model = WidgetViewModel(store: store, settings: settings, usage: usageLog)
+            widgetModel = model
+            let capture = CapturePanelController(model: CaptureModel(store: store, usage: usageLog))
+            capture.onVisibilityChanged = { [weak model] isOpen in
+                model?.isCapturing = isOpen
+            }
+            capturePanel = capture
+
+            let scheduler = ReminderScheduler(store: store, settings: settings, usage: usageLog)
             reminders = scheduler
             UNUserNotificationCenter.current().delegate = self
             model.onTick = { scheduler.evaluate() }
@@ -95,7 +107,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, UNUser
             }
 
             let purged = try store.performLaunchMaintenance()
-            log.info("Opened store at \(url.path, privacy: .public); purged \(purged) dead records")
+            let purgedEvents = try usageLog.purgeOldEvents()
+            log.info("Opened store at \(url.path, privacy: .public); purged \(purged) dead records and \(purgedEvents) old events")
         } catch {
             log.error("Could not open the task store: \(String(describing: error), privacy: .public)")
             presentStorageFailure(error)
@@ -129,12 +142,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, UNUser
 
     // MARK: - Capture
 
-    private func presentCapture(startedAt: CFAbsoluteTime) {
+    private func presentCapture(startedAt: CFAbsoluteTime, source: TaskSource = .hotkey) {
         guard let capturePanel else {
             log.error("Hot key fired with no capture panel available")
             return
         }
-        capturePanel.present(startedAt: startedAt)
+        usage?.record(.captureOpened)
+        capturePanel.present(startedAt: startedAt, source: source)
     }
 
     // MARK: - Status item
@@ -208,7 +222,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, UNUser
     }
 
     @objc private func captureFromMenu() {
-        presentCapture(startedAt: CFAbsoluteTimeGetCurrent())
+        presentCapture(startedAt: CFAbsoluteTimeGetCurrent(), source: .widget)
     }
 
     @objc private func openSettings() {

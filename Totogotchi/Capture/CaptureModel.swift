@@ -9,15 +9,23 @@ final class CaptureModel: ObservableObject {
     @Published var text = ""
     @Published var hint: String?
     @Published private(set) var lastCreatedTitle: String?
+    /// What pressing Enter would set right now, shown beside the field so the
+    /// user can see a token took effect before committing to it.
+    @Published private(set) var preview: ParsedCapture?
 
     private let store: TaskStore
+    private let usage: UsageLog
     private let log = Logger(subsystem: "com.esauortega.Totogotchi", category: "capture")
+
+    /// How the field was opened, carried onto the task it creates.
+    var source: TaskSource = .hotkey
 
     /// Called when the field should close, for example after Esc.
     var onDismiss: (() -> Void)?
 
-    init(store: TaskStore) {
+    init(store: TaskStore, usage: UsageLog) {
         self.store = store
+        self.usage = usage
     }
 
     /// Creates a task from the current text.
@@ -28,10 +36,12 @@ final class CaptureModel: ObservableObject {
     func submit() {
         let started = CFAbsoluteTimeGetCurrent()
         do {
-            let task = try store.create(title: text)
+            let task = try store.createFromCapture(text)
             text = ""
             hint = nil
+            preview = nil
             lastCreatedTitle = task.title
+            usage.record(.taskCreated, taskID: task.id, source: source)
             let elapsed = (CFAbsoluteTimeGetCurrent() - started) * 1_000
             log.info("Created task in \(elapsed, format: .fixed(precision: 1)) ms")
         } catch let error as TaskValidationError {
@@ -48,11 +58,16 @@ final class CaptureModel: ObservableObject {
     func cancel() {
         text = ""
         hint = nil
+        usage.record(.captureCancelled)
         onDismiss?()
     }
 
-    /// Clears a stale hint as soon as the user starts fixing the problem.
+    /// Clears a stale hint as soon as the user starts fixing the problem, and
+    /// keeps the token preview in step with what has been typed.
     func textChanged() {
         if hint != nil, !text.isEmpty { hint = nil }
+        let parsed = store.parseCapture(text)
+        // Nothing to show unless a token actually landed.
+        preview = (parsed.priority == nil && parsed.dueDate == nil) ? nil : parsed
     }
 }
