@@ -182,3 +182,69 @@ happened is still animated.
 The `frameRate` on `PetAnimation` is kept because stepping a discrete pose is
 still the right way to drive sprite motion, but it is no longer load-bearing:
 the measurements showed frame rate does not control the cost.
+
+### The due-date editor, and why the guardrail needed it
+
+Task rows gained a Due submenu with Today, Tomorrow, Next Week and a calendar
+picker. No spec in this change asked for it.
+
+It is here because `specs/weekly-summary` requires counting a task as deferred
+when its due date moves into a later week, and nothing in the app could move a
+due date. The list edited titles; tokens applied only at capture. The deferred
+count would have been permanently zero, the guardrail would have read as perfect
+no matter what the user did, and the single metric designed to catch a 100%
+completion rate being gamed would have shipped inert.
+
+`TaskStore.reschedule` returns whether the move counted as a deferral, so the
+rule lives with the data rather than in the view. Moving within a week, pulling a
+task earlier, and moving a task that is already done all correctly count as
+nothing.
+
+### Weekly statistics: half recomputed, half accumulated
+
+`due` and `completed` are derived from the tasks on every read, and for the
+current week they come straight from the same `WeekView` the list is drawn from,
+so the summary cannot disagree with what is on screen above it.
+
+`deleted` and `deferred` are accumulated, because they cannot be recovered later:
+a deleted task is purged after thirty days, and a task moved out of a week leaves
+no evidence in that week once its due date has changed. Those two are also the
+only counts that can drift, which is why both are shown in the card rather than
+hidden in a database.
+
+### The summary card replaced the celebration banner
+
+The banner added in the previous change said one sentence. The card says the
+number that PRD §8 calls the primary metric, with the guardrail beside it, and
+covers the list as `specs/weekly-summary` describes. It is reachable three ways:
+on Sunday from 20:00, when the week is cleared early, and from the status menu at
+any time. The first two share one dismissal flag, so clearing the week on
+Thursday does not mean seeing the same card again on Sunday.
+
+The guardrail line is shown only when something actually slipped, so a clean week
+is not cluttered with a zero.
+
+### Export format 2
+
+Version 2 carries the weekly counters and the usage log alongside the tasks.
+Version 1 files still import as tasks with no history, because refusing to read
+what the app itself wrote last month would be a poor way to treat a backup.
+`readableFormatVersions` makes that explicit rather than leaving it to an
+inequality.
+
+### Result: task 6.2, idle cost with a thousand tasks
+
+Release build, widget expanded, 1,005 tasks stored, pet at rest. Total process
+CPU moved from 1.01 s to 1.02 s across roughly 100 seconds of sitting still, so
+the steady-state idle is about **0.01%** against a 1% budget. The lifetime
+average of 0.55% is almost entirely the launch itself: opening a 1,005-task store
+and drawing the first frame costs about a second of CPU once.
+
+Physical footprint 37 MB against 80 MB. Resident set size 104.6 MB, which is the
+metric PRD §5.4 deliberately stopped using.
+
+One number worth watching: the one-minute tick, which now rebuilds the week view
+and derives the pet state together, measured a median of 36.7 ms and a maximum of
+80.4 ms with 1,005 tasks. That is inside the 100 ms the list-render budget allows,
+but it is the closest anything in this project has come to a budget, and the
+streak walk is what pushed it there.

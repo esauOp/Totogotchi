@@ -43,5 +43,5 @@
 ## 6. Acceptance
 
 - [ ] 6.1 Walk every scenario in the four specs of this change as a manual QA pass against a scratch store, not the owner's tasks, and verify each passes; note any deviation in design.md
-- [ ] 6.2 Verify idle CPU stays under 1% and physical footprint under 80 MB with the widget expanded, animations running and 1,000 tasks stored
+- [x] 6.2 Verify idle CPU stays under 1% and physical footprint under 80 MB with the widget expanded, animations running and 1,000 tasks stored
 - [x] 6.3 Run `swift test` in `TotogotchiCore` and verify the whole suite passes, including the tests added by this change
