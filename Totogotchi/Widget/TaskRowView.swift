@@ -66,9 +66,55 @@ struct TaskRowView: View {
         .contextMenu {
             Button(task.isCompleted ? "Mark Not Done" : "Mark Done") { model.toggleCompletion(task) }
             Button("Rename\u{2026}") { model.beginEditing(task) }
+            Menu("Due") {
+                Button("Today") { model.reschedule(task, to: endOfDay(offsetDays: 0)) }
+                Button("Tomorrow") { model.reschedule(task, to: endOfDay(offsetDays: 1)) }
+                Button("Next Week") { model.reschedule(task, to: endOfDay(offsetDays: 7)) }
+                Divider()
+                Button("Pick a Date\u{2026}") { model.reschedulingID = task.id }
+            }
             Divider()
             Button("Delete", role: .destructive) { model.delete(task) }
         }
+        .popover(
+            isPresented: Binding(
+                get: { model.reschedulingID == task.id },
+                set: { if !$0 { model.reschedulingID = nil } }
+            )
+        ) {
+            datePicker
+        }
+    }
+
+    /// A calendar picker for the cases the quick options do not cover.
+    private var datePicker: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            DatePicker(
+                "Due",
+                selection: Binding(
+                    get: { task.dueDate },
+                    set: { model.reschedule(task, to: endOfDay(for: $0)) }
+                ),
+                displayedComponents: .date
+            )
+            .datePickerStyle(.graphical)
+            .labelsHidden()
+        }
+        .padding(12)
+        .frame(width: 280)
+    }
+
+    /// Tasks fall due at the end of a day, the same convention capture tokens
+    /// use, so a date chosen here means the same thing as `@fri` typed there.
+    private func endOfDay(for date: Date) -> Date {
+        var calendar = Calendar(identifier: .iso8601)
+        calendar.timeZone = .current
+        guard let interval = calendar.dateInterval(of: .day, for: date) else { return date }
+        return interval.end.addingTimeInterval(-1)
+    }
+
+    private func endOfDay(offsetDays: Int) -> Date {
+        endOfDay(for: Date().addingTimeInterval(Double(offsetDays) * 86_400))
     }
 
     private var dueLabel: String {

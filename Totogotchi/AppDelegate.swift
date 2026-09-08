@@ -15,6 +15,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, UNUser
     private var toggleWidgetItem: NSMenuItem?
     private var taskStore: TaskStore?
     private var usage: UsageLog?
+    private var counters: WeeklyStatsRepository?
     private var widgetModel: WidgetViewModel?
     private var widgetPanel: WidgetPanelController?
     private var capturePanel: CapturePanelController?
@@ -84,7 +85,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, UNUser
             usage = usageLog
             usageLog.record(.appLaunched)
 
-            let model = WidgetViewModel(store: store, settings: settings, usage: usageLog)
+            let statsCounters = try SwiftDataWeeklyStatsRepository(url: url)
+            counters = statsCounters
+
+            let model = WidgetViewModel(
+                store: store,
+                settings: settings,
+                usage: usageLog,
+                counters: statsCounters
+            )
             widgetModel = model
             let capture = CapturePanelController(model: CaptureModel(store: store, usage: usageLog))
             capture.onVisibilityChanged = { [weak model] isOpen in
@@ -108,6 +117,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, UNUser
 
             let purged = try store.performLaunchMaintenance()
             let purgedEvents = try usageLog.purgeOldEvents()
+            _ = try store.purgeOldWeeklyStats(counters: statsCounters)
             log.info("Opened store at \(url.path, privacy: .public); purged \(purged) dead records and \(purgedEvents) old events")
         } catch {
             log.error("Could not open the task store: \(String(describing: error), privacy: .public)")
@@ -166,6 +176,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, UNUser
         )
         capture.target = self
 
+        let summary = menu.addItem(
+            withTitle: "This Week's Summary",
+            action: #selector(showSummary),
+            keyEquivalent: ""
+        )
+        summary.target = self
+
         let toggle = menu.addItem(
             withTitle: "Hide Widget",
             action: #selector(toggleWidget),
@@ -219,6 +236,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, UNUser
 
     func menuNeedsUpdate(_ menu: NSMenu) {
         toggleWidgetItem?.title = (widgetPanel?.isVisible ?? false) ? "Hide Widget" : "Show Widget"
+    }
+
+    @objc private func showSummary() {
+        widgetPanel?.showExpanded()
+        widgetModel?.showSummary()
     }
 
     @objc private func captureFromMenu() {

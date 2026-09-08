@@ -45,7 +45,7 @@ public final class SwiftDataTaskRepository: TaskRepository {
         // one store file; a container that knew only half the schema would
         // fight the other one.
         container = try ModelContainer(
-            for: TaskRecord.self, UsageEventRecord.self,
+            for: TaskRecord.self, UsageEventRecord.self, WeeklyStatsRecord.self,
             configurations: configuration
         )
         context = ModelContext(container)

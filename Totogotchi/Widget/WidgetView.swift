@@ -11,12 +11,12 @@ struct WidgetView: View {
     var body: some View {
         VStack(spacing: 0) {
             header
-            if model.celebratingWeek != nil {
-                Divider()
-                celebrationBanner
-            }
             Divider()
-            list
+            if model.summaryWeek != nil {
+                summaryCard
+            } else {
+                list
+            }
             if let undo = model.pendingUndo {
                 Divider()
                 undoBar(undo)
@@ -134,22 +134,20 @@ struct WidgetView: View {
         }
     }
 
-    // MARK: - Celebration
+    // MARK: - Weekly summary
 
-    private var celebrationBanner: some View {
-        HStack(spacing: 8) {
-            Text("Week clear. Every task done.")
-                .font(.callout.weight(.medium))
-            Spacer(minLength: 0)
-            Button("Dismiss") { model.dismissCelebration() }
-                .buttonStyle(.link)
-                .font(.caption)
+    private var summaryCard: some View {
+        ScrollView {
+            WeeklySummaryCard(
+                stats: model.weeklyStats(),
+                streakDays: model.petState.streakDays,
+                mood: model.displayedMood,
+                reason: model.petState.reason,
+                canStartNextWeek: model.canStartNextWeek,
+                onDismiss: { model.dismissSummary() }
+            )
         }
-        .padding(.horizontal, 12)
-        .padding(.vertical, 8)
-        .background(Color.accentColor.opacity(0.12))
-        .accessibilityElement(children: .combine)
-        .accessibilityLabel("Every task due this week is done")
+        .frame(maxHeight: .infinity)
     }
 
     // MARK: - Undo

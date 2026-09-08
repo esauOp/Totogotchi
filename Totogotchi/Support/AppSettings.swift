@@ -9,7 +9,7 @@ final class AppSettings {
         static let fallbackNoticeShownFor = "fallbackNoticeShownFor"
         static let widgetFrame = "widgetFrame"
         static let widgetCollapsed = "widgetCollapsed"
-        static let celebrationDismissedWeek = "celebrationDismissedWeek"
+        static let summaryDismissedWeek = "summaryDismissedWeek"
         static let notificationsEnabled = "notificationsEnabled"
         static let notifiedDueDates = "notifiedDueDates"
     }
@@ -52,21 +52,21 @@ final class AppSettings {
         set { defaults.set(newValue, forKey: Key.notifiedDueDates) }
     }
 
-    /// The week whose congratulation banner the user has already dismissed, so
-    /// finishing early does not mean seeing it again on Sunday.
-    var celebrationDismissedWeek: ISOWeek? {
+    /// The week whose summary card the user has already dismissed, so finishing
+    /// early does not mean seeing it again on Sunday.
+    var summaryDismissedWeek: ISOWeek? {
         get {
-            guard let text = defaults.string(forKey: Key.celebrationDismissedWeek) else { return nil }
+            guard let text = defaults.string(forKey: Key.summaryDismissedWeek) else { return nil }
             let parts = text.split(separator: "-").compactMap { Int($0) }
             guard parts.count == 2 else { return nil }
             return ISOWeek(year: parts[0], week: parts[1])
         }
         set {
             guard let newValue else {
-                defaults.removeObject(forKey: Key.celebrationDismissedWeek)
+                defaults.removeObject(forKey: Key.summaryDismissedWeek)
                 return
             }
-            defaults.set("\(newValue.year)-\(newValue.week)", forKey: Key.celebrationDismissedWeek)
+            defaults.set("\(newValue.year)-\(newValue.week)", forKey: Key.summaryDismissedWeek)
         }
     }
 

@@ -187,6 +187,26 @@ public final class TaskStore {
         return task
     }
 
+    /// Moves a task's due date.
+    ///
+    /// Returns whether the move counts as a deferral: the task left the ISO week
+    /// it was in for a later one, without being done. That is the guardrail in
+    /// PRD §8, and it is the only way a perfect completion rate can be told apart
+    /// from a week whose work was quietly pushed along.
+    @discardableResult
+    public func reschedule(_ id: UUID, to newDueDate: Date) throws -> (task: TaskItem, deferredFrom: Date?) {
+        var task = try require(id)
+        let previousDueDate = task.dueDate
+        task.dueDate = newDueDate
+        try repository.upsert(task)
+        recordChange()
+
+        let wasWeek = week.isoWeek(of: previousDueDate)
+        let nowWeek = week.isoWeek(of: newDueDate)
+        let deferred = !task.isCompleted && nowWeek > wasWeek
+        return (task, deferred ? previousDueDate : nil)
+    }
+
     @discardableResult
     public func complete(_ id: UUID) throws -> TaskItem {
         let now = clock()

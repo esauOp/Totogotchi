@@ -20,7 +20,7 @@ public final class SwiftDataUsageLogRepository: UsageLogRepository {
 
     public init(configuration: ModelConfiguration) throws {
         container = try ModelContainer(
-            for: TaskRecord.self, UsageEventRecord.self,
+            for: TaskRecord.self, UsageEventRecord.self, WeeklyStatsRecord.self,
             configurations: configuration
         )
         context = ModelContext(container)

@@ -17,8 +17,8 @@ final class WidgetViewModel: ObservableObject {
     /// A short-lived mood that overrides the computed one, used for the cheer
     /// when a task is completed.
     @Published private(set) var reaction: PetMood?
-    /// The week whose congratulation banner is on screen, if any.
-    @Published private(set) var celebratingWeek: ISOWeek?
+    /// The week whose summary card is on screen, if any.
+    @Published private(set) var summaryWeek: ISOWeek?
     /// False while the widget is covered, hidden, or on another Space. The pet
     /// holds still rather than burning frames nobody can see.
     @Published var isPetAnimating = true
@@ -49,6 +49,7 @@ final class WidgetViewModel: ObservableObject {
     private let store: TaskStore
     private let settings: AppSettings
     private let usage: UsageLog
+    private let counters: WeeklyStatsRepository
     private let log = Logger(subsystem: "com.esauortega.Totogotchi", category: "widget")
     private var observation: TaskStoreObservation?
     private var tick: Timer?
@@ -56,10 +57,16 @@ final class WidgetViewModel: ObservableObject {
     private var reactionTimer: Timer?
     private var stirTimer: Timer?
 
-    init(store: TaskStore, settings: AppSettings, usage: UsageLog) {
+    init(
+        store: TaskStore,
+        settings: AppSettings,
+        usage: UsageLog,
+        counters: WeeklyStatsRepository
+    ) {
         self.store = store
         self.settings = settings
         self.usage = usage
+        self.counters = counters
         let emptyWeek = WeekView(week: ISOWeek(year: 0, week: 0), overdue: [], thisWeek: [], completed: [])
         weekView = (try? store.weekView()) ?? emptyWeek
         petState = (try? store.petState())
@@ -67,7 +74,7 @@ final class WidgetViewModel: ObservableObject {
         observation = store.observeChanges { [weak self] in
             MainActor.assumeIsolated { self?.refresh() }
         }
-        updateCelebrationBanner()
+        updateSummaryCard()
     }
 
     deinit {
@@ -93,7 +100,7 @@ final class WidgetViewModel: ObservableObject {
                 stirPet()
                 usage.record(.moodChanged, previousMood: previousMood, newMood: petState.mood)
             }
-            updateCelebrationBanner()
+            updateSummaryCard()
             let elapsed = (CFAbsoluteTimeGetCurrent() - started) * 1_000
             log.info("Week view and mood rebuilt in \(elapsed, format: .fixed(precision: 2)) ms; mood \(self.petState.mood.rawValue, privacy: .public)")
         } catch {
@@ -199,29 +206,74 @@ final class WidgetViewModel: ObservableObject {
         }
     }
 
-    /// Raises the banner the first time a week is completed, and never again
-    /// that week once it has been dismissed.
-    private func updateCelebrationBanner() {
-        guard petState.mood == .celebrating else {
-            celebratingWeek = nil
-            return
-        }
+    /// Raises the summary the first time a week is finished, or on Sunday
+    /// evening, and never again that week once it has been dismissed.
+    ///
+    /// The two triggers are deliberately one flag: finishing early on Thursday
+    /// should not mean seeing the same card again on Sunday.
+    private func updateSummaryCard() {
         let week = weekView.week
-        guard settings.celebrationDismissedWeek != week else {
-            celebratingWeek = nil
+        guard settings.summaryDismissedWeek != week else {
+            summaryWeek = nil
             return
         }
-        celebratingWeek = week
+        if petState.mood == .celebrating || isSummaryHour() {
+            summaryWeek = week
+        }
     }
 
-    func dismissCelebration() {
-        settings.celebrationDismissedWeek = weekView.week
-        celebratingWeek = nil
+    /// True from Sunday 20:00 local until the week rolls over.
+    private func isSummaryHour(now: Date? = nil) -> Bool {
+        var calendar = Calendar(identifier: .iso8601)
+        calendar.timeZone = .current
+        let moment = now ?? Date()
+        let parts = calendar.dateComponents([.weekday, .hour], from: moment)
+        return parts.weekday == 1 && (parts.hour ?? 0) >= 20
     }
+
+    /// Opened by hand from the status menu, which ignores the dismissal.
+    func showSummary() {
+        summaryWeek = weekView.week
+    }
+
+    func dismissSummary() {
+        settings.summaryDismissedWeek = weekView.week
+        summaryWeek = nil
+    }
+
+    /// After Sunday evening the button reads as moving on rather than hiding.
+    var canStartNextWeek: Bool { isSummaryHour() }
 
     func completeSelection() {
         guard let selection, let task = task(for: selection) else { return }
         toggleCompletion(task)
+    }
+
+    // MARK: - Rescheduling
+
+    /// The row currently showing its date picker, if any.
+    @Published var reschedulingID: UUID?
+
+    /// Moves a task's due date, and counts it against the week it left when the
+    /// move pushes unfinished work into a later week.
+    func reschedule(_ task: TaskItem, to newDueDate: Date) {
+        do {
+            let result = try store.reschedule(task.id, to: newDueDate)
+            if let from = result.deferredFrom {
+                try store.recordSlip(.deferred, inWeekOf: from, counters: counters)
+                usage.record(.taskDeferred, taskID: task.id)
+                log.info("Task deferred out of its week")
+            }
+            reschedulingID = nil
+        } catch {
+            log.error("Could not reschedule: \(String(describing: error), privacy: .public)")
+        }
+    }
+
+    /// The week's numbers, for the summary card.
+    func weeklyStats() -> WeeklyStats {
+        (try? store.weeklyStats(counters: counters))
+            ?? WeeklyStats(week: weekView.week)
     }
 
     // MARK: - Editing
@@ -264,6 +316,9 @@ final class WidgetViewModel: ObservableObject {
         do {
             try store.delete(task.id)
             usage.record(.taskDeleted, taskID: task.id)
+            if !task.isCompleted {
+                try store.recordSlip(.deleted, inWeekOf: task.dueDate, counters: counters)
+            }
             pendingUndo = PendingUndo(id: task.id, title: task.title)
             if selection == task.id { selection = nil }
             undoTimer = Timer.scheduledTimer(withTimeInterval: Self.undoWindow, repeats: false) { [weak self] _ in
