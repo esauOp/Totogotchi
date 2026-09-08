@@ -55,3 +55,13 @@ The system SHALL keep average CPU usage below 1% while the widget is visible and
 #### Scenario: Idle CPU measurement
 - **WHEN** the widget is visible, no user interaction occurs for 5 minutes, and CPU usage is sampled
 - **THEN** the average is below 1%
+
+## REMOVED Requirements
+
+### Requirement: Completion reaction
+**Reason**: Superseded by "Animated reactions" above, which covers the completion cheer and the celebration together rather than describing the cheer twice.
+**Migration**: None. The behaviour is unchanged: a reaction of at most 1.5 seconds, then back to the computed mood.
+
+### Requirement: Weekly completion banner
+**Reason**: Replaced by the `weekly-summary` capability. A one-line banner saying the week was cleared has become a card carrying the completion rate, the counts, the streak and the guardrail, which is what PRD §8 actually needs to be visible.
+**Migration**: None for the user; the card appears in the same situation the banner did, plus on Sunday evening and on demand from the status menu.

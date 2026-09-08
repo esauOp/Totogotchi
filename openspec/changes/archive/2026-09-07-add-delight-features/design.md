@@ -337,3 +337,20 @@ on a Monday, and the trigger is a real clock check rather than something the app
 exposes a way to force. The same dismissal flag and the same card are exercised
 by the early-completion path, so what is unverified is one weekday comparison.
 Recorded rather than glossed.
+
+### Flaw in how this change's delta was written
+
+The delta specs declared everything under `## ADDED Requirements`, including two
+requirements that this change actually retires: `pet-mood`'s "Completion
+reaction", which "Animated reactions" now covers, and its "Weekly completion
+banner", which the `weekly-summary` card replaced. Merging as written produced a
+main spec that described the same reaction twice and still promised a banner the
+app no longer shows.
+
+Fixed by adding a `## REMOVED Requirements` section to the delta, with a reason
+and a migration note for each, and re-merging. `pet-mood` went from 13
+requirements to 11.
+
+Worth recording because the mistake is easy to repeat: a change that supersedes
+earlier behaviour has to say so in the delta, or archiving quietly accumulates
+contradictions in the standing spec.

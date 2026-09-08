@@ -430,8 +430,8 @@ Based on 4-week review: recurring tasks, naming/skins, full-screen overlay, Shor
 | M1 Capture + persistence | Week 3 | Stories 1.1, 5.1 pass | **Done 2026-09-06.** Change `add-task-capture-and-storage` archived; all 26 tasks verified |
 | M2 Widget + list | Week 4 | Stories 2.1, 2.2, 3.1 pass | **Done 2026-09-07.** Change `add-floating-widget-and-task-list` archived; all 27 tasks and all 32 spec scenarios verified |
 | M3 Pet + reminders (MVP) | Week 6 | Stories 4.1, 6.1 pass; static pet images | **Done 2026-09-07.** Change `add-pet-mood-and-reminders` archived; all 24 tasks and all 24 spec scenarios verified |
-| M4 Dogfood week | Week 7 | Owner uses daily; bugs fixed | Not started |
-| M5 Delight release | Week 9 | Animations, tokens, weekly summary | Not started. Change `add-delight-features` |
+| M4 Dogfood week | Week 7 | Owner uses daily; bugs fixed | Not started. Everything it needs is built; this one is calendar time, not code |
+| M5 Delight release | Week 9 | Animations, tokens, weekly summary | **Done 2026-09-07.** Change `add-delight-features` archived; all 30 tasks and 30 of 31 spec scenarios verified |
 | M6 First 4-week review | Week 13 | Decide iterate / expand / roll back | Not started |
 
 `[ASSUMPTION: week numbers assume ≈ 10 h/week starting the week of 2026-09-07.]`
