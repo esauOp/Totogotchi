@@ -26,7 +26,9 @@
 ### 2.1 Problem definition
 The owner records tasks in daily and weekly meetings, but current tooling does not keep them visible or make prioritizing easy. Result: tasks are forgotten "on the way" and the week ends with incomplete work.
 
-Quantified impact: `[TBD — needs data]`. Evidence that would fill the gap: two weeks of manual logging of (a) tasks captured, (b) tasks completed by Sunday, (c) tasks forgotten and rediscovered late. This also produces the baseline for §8.
+Quantified impact, from the owner's own estimate on 2026-09-07: roughly **15 tasks captured per week**, of which about **70% are closed by the end of the week**. That leaves four to five tasks slipping every week, which is the gap this product exists to close.
+
+This is a self-reported estimate, not measured logging, so treat it as an anchor rather than a precise baseline. It is good enough to size the problem and to set the primary metric's starting point. From week one the app records `WeeklyStats` itself, and those measured figures supersede this estimate for any judgement about whether the product is working.
 
 Supporting evidence provided by the owner:
 - Pain point: "Not a good task management and forgetting some things on the way."
@@ -371,15 +373,17 @@ See §5.4. Additional: no network, so bandwidth is N/A. Database indexed on `due
 
 | Metric | Type | Baseline | Target | Timeframe | How measured |
 |---|---|---|---|---|---|
-| Weekly task completion rate (completed ÷ due in ISO week) | Primary | `[TBD — needs data: log 2 weeks manually before launch]` | 100% | Each week, reviewed Sunday; sustained for 4 consecutive weeks within 8 weeks of launch | `WeeklyStats` row, shown in weekly summary |
+| Weekly task completion rate (completed ÷ due in ISO week) | Primary | ~70% over ~15 tasks a week (owner's estimate, 2026-09-07) | 100% | Each week, reviewed Sunday; sustained for 4 consecutive weeks within 8 weeks of launch | `WeeklyStats` row, shown in weekly summary |
 | Tasks captured via hotkey ÷ total tasks captured | Secondary | 0 (feature does not exist) | ≥ 80% | Weeks 1–4 | Local event log |
 | Median time from hotkey to task saved | Secondary | N/A | ≤ 5 s | Weeks 1–4 | Timestamps in local event log |
-| Overdue tasks at week end | Secondary | `[TBD — needs data]` | 0 | Weekly | `WeeklyStats` |
+| Overdue tasks at week end | Secondary | 4 to 5 (the 30% of ~15 that do not close) | 0 | Weekly | `WeeklyStats` |
 | Days per week app was running | Secondary | N/A | ≥ 5 | Weekly | Launch/quit log |
-| Tasks deleted or deferred to next week ÷ tasks due | Guardrail | `[TBD — needs data]` | ≤ 10% | Weekly | `WeeklyStats.tasksDeleted + tasksDeferred` |
+| Tasks deleted or deferred to next week ÷ tasks due | Guardrail | Unknown; the owner's estimate does not split the 30% that miss into deferred, deleted and simply forgotten | ≤ 10% | Weekly | `WeeklyStats.tasksDeleted + tasksDeferred` |
 | Crash-free sessions | Guardrail | N/A | ≥ 99.5% | Rolling 4 weeks | Console crash logs |
 
-Note on the primary target: 100% is the owner's stated goal. It is achievable only if the guardrail holds; otherwise the metric can be gamed by deleting or deferring tasks. The review decision uses both together.
+Note on the primary target: 100% is the owner's stated goal, and it is a 30-point jump from the estimated starting point of 70%. The gap is four to five tasks a week, which is small enough in absolute terms to be worth aiming at directly rather than stepping towards.
+
+It is achievable only if the guardrail holds. Deleting or deferring the four or five that would have missed produces a perfect completion rate and no change in behaviour at all, which is exactly the failure this metric invites. The guardrail's own baseline is unknown, so the first four weeks establish it: whatever deferral rate appears alongside a rising completion rate is the number to watch. The review decision uses both together.
 
 **Analytics implementation**
 - Events (local only, stored in a lightweight `EventLog` table, never transmitted): `task_created {source: hotkey|widget}`, `task_completed`, `task_deleted`, `task_deferred`, `capture_opened`, `capture_cancelled`, `mood_changed {from, to}`, `notification_shown`, `notification_clicked`, `app_launched`, `app_quit`.
@@ -457,7 +461,7 @@ Based on 4-week review: recurring tasks, naming/skins, full-screen overlay, Shor
 | # | Item | What is unknown | Why it matters | Who answers | By when |
 |---|---|---|---|---|---|
 | 1 | `[ASSUMPTION]` MVP effort 6–8 part-time weeks, no budget beyond Apple Developer account (§1) | Actual weekly hours available | Drives every milestone date in §9 | Owner | M0 |
-| 2 | `[TBD]` Quantified impact of forgotten tasks; baseline completion rate (§2.1, §8) | How many tasks are captured, completed, forgotten per week today | Without a baseline the 100% target cannot show improvement | Owner, via 2 weeks of manual logging | Before M1 |
+| 2 | **ANSWERED 2026-09-07** Baseline is ~15 tasks captured a week at ~70% closed (§2.1, §8) | Resolved by the owner's estimate rather than the two weeks of logging originally planned | Anchors the primary metric. The split of the missing 30% into deferred, deleted and forgotten is still unknown, and the guardrail's baseline comes from the app's own first four weeks | Owner | Closed |
 | 3 | `[TBD]` Market size, segment size, market timing (§1, §2.2) | No research done | Irrelevant for personal use; required before any public release | Owner | Before public release decision |
 | 4 | `[TBD]` Competitor review (Things, Reminders, Todoist, Habitica) (§2.2) | Whether an equivalent always-on-top pet widget exists | Validates the differentiator | Owner | Before public release decision |
 | 5 | `[ASSUMPTION]` Persona A represents the broader target (§3.1) | Whether other users share the same workflow | Feature priorities may shift for other personas | Owner, after 4 weeks of use | M6 |
